@@ -107,6 +107,13 @@ class SpyEngine extends RenderingEngine
         return parent::fill($path, $paint, $rule);
     }
 
+    public function stroke(\Surface\NutsAndBolts\Path $path, Color|\Surface\NutsAndBolts\Gradient $paint, \Surface\Contracts\Drawing\StrokeStyle $style): static
+    {
+        $this->calls[] = [__FUNCTION__, func_get_args()];
+
+        return parent::stroke($path, $paint, $style);
+    }
+
     public function image(Framebuffer $source, float $x, float $y, ?float $width = null, ?float $height = null, float $opacity = 1.0, Filter $filter = Filter::NEAREST, ?array $radii = null, ?\Surface\NutsAndBolts\Color $tint = null, ?array $sourceRect = null): static
     {
         $this->calls[] = [__FUNCTION__, func_get_args()];

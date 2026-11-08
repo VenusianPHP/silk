@@ -83,14 +83,15 @@ class EnginePainter implements Painter
 
     public function fill(Path $path, Color|Gradient $paint, FillRule $rule = FillRule::NON_ZERO): static
     {
-        $this->clips->isEmpty() || $this->engine->fill($path->transformed($this->matrix()), $this->devicePaint($paint), $rule);
+        $this->clips->isEmpty() || $this->pathCulled($path, 0.0) || $this->engine->fill($path->transformed($this->matrix()), $this->devicePaint($paint), $rule);
 
         return $this;
     }
 
     public function stroke(Path $path, Color|Gradient $paint, StrokeStyle $style): static
     {
-        if ($this->clips->isEmpty()) {
+        // (a stroke reaches half its width past the path, and a miter join up to its limit times that)
+        if ($this->clips->isEmpty() || $this->pathCulled($path, $style->width * max(1.0, $style->miterLimit) / 2 + 1.0)) {
             return $this;
         }
         $k = $this->scale * $this->top()[0];
@@ -147,9 +148,9 @@ class EnginePainter implements Painter
 
     /**
      * The pane is a Surface glass pane (RenderingEngine::glass): the backdrop under the rounded box blurred by Raven's
-     * radius, saturated, grained, tinted and lit. The shadow goes on after, outside the box only (four strips around it), because
-     * Raven takes the backdrop before the shadow (draw.c:556) and the layer reads what is painted. The hairline is an
-     * ordinary rect outline over it.
+     * radius, saturated, grained, tinted and lit. The shadow is the engine's, painted after the backdrop is read (Raven takes the
+     * backdrop before the shadow, draw.c:556) and before the pane, which covers its own rounded box. The hairline is an ordinary
+     * rect outline over it.
      */
     public function blur(Rect $r, float|array $radii, BlurLook $look): static
     {
@@ -161,12 +162,17 @@ class EnginePainter implements Painter
         $k = $this->scale * $s;
         $device = EngineLowering::clamp(array_map(fn ($v) => $v * $k, is_array($radii) ? $radii : array_fill(0, 4, $radii)), $d->w, $d->h);
         $opacity = min(1.0, max(0.0, end($this->opacity)));
+        // the pane's shadow is the engine's, painted between the backdrop's capture and the pane; a pane faded below full opacity
+        // would show it through, so that one has four strips around its box instead
+        $shadow = $look->shadow > 0 && $look->shadowColor !== null;
+        $inGlass = $shadow && $opacity >= 1.0;
         if ($opacity > 0.0) {
             $this->engine->glass($d->x, $d->y, $d->w, $d->h, $device, new Glass(
                 blur: min(96.0, max(0.0, $look->radius)) * $k, tint: $look->tint, saturation: max(0.0, $look->saturation), light: $look->light, grain: max(0.0, $look->grain),
+                shadow: $inGlass ? $look->shadow * $k : 0.0, shadowColor: $inGlass ? $this->fade($look->shadowColor) : null,
             ), $opacity);
         }
-        if ($look->shadow > 0 && $look->shadowColor !== null) {
+        if ($shadow && ! $inGlass) {
             $this->shadowAround($r, is_array($radii) ? $radii[0] : $radii, $look->shadow, $look->shadowColor);
         }
         if ($look->border !== null && $look->borderWidth > 0) {
@@ -190,6 +196,8 @@ class EnginePainter implements Painter
         $k = $this->scale * $s;
         $device = EngineLowering::clamp(array_map(fn ($v) => $v * $k, is_array($radii) ? $radii : array_fill(0, 4, $radii)), $d->w, $d->h);
         $opacity = min(1.0, max(0.0, end($this->opacity)));
+        $shadow = $look->shadow > 0 && $look->shadowColor !== null;
+        $inGlass = $shadow && $opacity >= 1.0;
         $half = min($d->w, $d->h) / 2;
         $bevel = min(($look->bevel > 0.0 ? $look->bevel : max(3.0, min(14.0, min($r->w, $r->h) * 0.42))) * $k, $half * 0.95);
         $refraction = max(0.0, $look->refraction) * $k;
@@ -199,9 +207,10 @@ class EnginePainter implements Painter
             $this->engine->glass($d->x, $d->y, $d->w, $d->h, $device, new Glass(
                 blur: 22.0, tint: $look->tint, saturation: max(0.0, $look->saturation), light: $look->glow, rim: $look->rim,
                 bevel: $bevel, refraction: $refraction, frost: max(0.0, min(1.0, $look->frost)),
+                shadow: $inGlass ? $look->shadow * $k : 0.0, shadowColor: $inGlass ? $this->fade($look->shadowColor) : null,
             ), $opacity);
         }
-        if ($look->shadow > 0 && $look->shadowColor !== null) {
+        if ($shadow && ! $inGlass) {
             $this->shadowAround($r, is_array($radii) ? $radii[0] : $radii, $look->shadow, $look->shadowColor);
         }
 
@@ -445,19 +454,42 @@ class EnginePainter implements Painter
         return $x1 > $x0 && $y1 > $y0 ? new Rect($x0, $y0, $x1 - $x0, $y1 - $y0) : null;
     }
 
-    /** True when the transformed rect lies more than CULL_MARGIN units outside the viewport. */
+    /**
+     * True when the transformed rect lies more than CULL_MARGIN units outside the viewport, or wholly outside the clip:
+     * the engine would cut it away, so it never records it. (Under a stretch, whose shapes are in the engine's own space
+     * until it pops, the clip is not tested.)
+     */
     private function culled(Rect $r): bool
     {
         if ($this->clips->isEmpty()) {
             return true;
         }
-        [$s, $tx, $ty] = $this->top();
+        [$s, $tx, $ty, $stretched] = $this->top();
         $v = $this->viewport();
         $m = self::CULL_MARGIN;
         $x = $r->x * $s + $tx;
         $y = $r->y * $s + $ty;
+        if ($x + $r->w * $s < -$m || $y + $r->h * $s < -$m || $x > $v->w + $m || $y > $v->h + $m) {
+            return true;
+        }
+        if ($stretched) {
+            return false;
+        }
+        $c = $this->clips->current();
+        $k = $this->scale;
 
-        return $x + $r->w * $s < -$m || $y + $r->h * $s < -$m || $x > $v->w + $m || $y > $v->h + $m;
+        return ($x + $r->w * $s) * $k <= $c->x || ($y + $r->h * $s) * $k <= $c->y || $x * $k >= $c->x + $c->w || $y * $k >= $c->y + $c->h;
+    }
+
+    /** True when the path, grown by $grow units, lies wholly outside the viewport margin or the clip. A path with no point draws nothing. */
+    private function pathCulled(Path $path, float $grow): bool
+    {
+        if ($this->top()[3]) {
+            return false;
+        }
+        $b = $path->bounds();
+
+        return $b === null || $this->culled(new Rect($b[0] - $grow, $b[1] - $grow, $b[2] - $b[0] + 2 * $grow, $b[3] - $b[1] + 2 * $grow));
     }
 
     private function fade(Color $c): Color

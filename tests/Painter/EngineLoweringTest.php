@@ -54,8 +54,45 @@ it('culls a rect more than 48 units outside the viewport', function () {
 
     expect($e->calls)->toBe([]);
 
-    $e = painted(fn ($p) => $p->rect(new Rect(-140, 10, 100, 10), Color::hex('#000000')));
+    $e = painted(fn ($p) => $p->rect(new Rect(-40, 10, 100, 10), Color::hex('#000000')));
     expect($e->methods())->toBe(['roundRect']);
+});
+
+/** The drawing calls of a frame, without the clips the painter set. */
+function drawn(SpyEngine $e): array
+{
+    return array_values(array_diff($e->methods(), ['clip']));
+}
+
+it('culls what lies wholly outside the clip, and keeps what touches it', function () {
+    $e = painted(fn ($p) => $p->pushClip(new Rect(100, 100, 50, 50))
+        ->rect(new Rect(10, 10, 40, 40), Color::hex('#000000'))
+        ->rect(new Rect(150, 100, 40, 40), Color::hex('#000000'))
+        ->shadow(new Rect(10, 10, 20, 20), 4, 8, Color::hex('#000000'))
+        ->line(0, 0, 90, 90, Color::hex('#000000'), 2.0)
+        ->popClip());
+    expect(drawn($e))->toBe([]);
+
+    $e = painted(fn ($p) => $p->pushClip(new Rect(100, 100, 50, 50))
+        ->rect(new Rect(140, 140, 40, 40), Color::hex('#000000'))
+        ->shadow(new Rect(60, 100, 20, 20), 4, 24, Color::hex('#000000'))
+        ->popClip());
+    expect(drawn($e))->toBe(['roundRect', 'shadow']);
+});
+
+it('culls a path by the box of its points, grown by half a stroke and the miter limit', function () {
+    $path = (new \Surface\NutsAndBolts\Path())->moveTo(10, 10)->cubicTo(20, 0, 30, 0, 40, 10);
+    $style = new \Surface\Contracts\Drawing\StrokeStyle(4.0);
+
+    $e = painted(fn ($p) => $p->pushClip(new Rect(100, 100, 50, 50))->fill($path, Color::hex('#000000'))->stroke($path, Color::hex('#000000'), $style)->popClip());
+    expect(drawn($e))->toBe([]);
+
+    // a clip 3 units from the box: a stroke of 4 with the default miter limit reaches 2 x limit past it, a fill does not
+    $near = new Rect(43, 0, 20, 20);
+    $e = painted(fn ($p) => $p->pushClip($near)->fill($path, Color::hex('#000000'))->popClip());
+    expect(drawn($e))->toBe([]);
+    $e = painted(fn ($p) => $p->pushClip($near)->stroke($path, Color::hex('#000000'), $style)->popClip());
+    expect(drawn($e))->toBe(['stroke']);
 });
 
 it('lowers a shadow to one engine shadow op, unoffset (the engine offsets by blur/4)', function () {

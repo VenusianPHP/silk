@@ -108,6 +108,109 @@ it('runs pulses of light along the wires while the flow shows: bright stretches 
         ->and($layers[0][1][3]->steps[0])->toBeInstanceOf(Surface\Contracts\Drawing\Effects\Blur::class);
 });
 
+/** A graph whose pulses run, settled and painted, with nothing waiting to repaint: only the next tick will ask. */
+function pulsingGraph(): object
+{
+    $ui = nodeGraphUi('macos-dark');
+    $ui->g->connect($ui->out, $ui->a);
+    $ui->g->setFlowVisible(true);
+    nodeGraphPaint($ui);
+    $ui->g->markPainted();
+
+    return $ui;
+}
+
+it('paints only where the glints are on a frame the pulses alone asked for, and those layers lie inside it', function () {
+    $ui = pulsingGraph();
+    $full = $ui->g->bounds()->grow(Silk\Core\Tree\Widget::OVERDRAW);
+    $ui->tree->advance(1 / 60);
+    $extent = $ui->g->paintExtent();
+    $p = new Venusian\Silk\Tests\Support\SpyPainter;
+    $ui->g->render($p);
+    $layers = callsOf($p, 'layer');
+    $inside = true;
+    foreach ($layers as $layer) {
+        $box = $layer[1][0];
+        [$x0, $y0] = ngAt($ui, $box->x, $box->y);
+        [$x1, $y1] = ngAt($ui, $box->x + $box->w, $box->y + $box->h);
+        $inside = $inside && $x0 >= $extent->x - 1e-6 && $y0 >= $extent->y - 1e-6 && $x1 <= $extent->x + $extent->w + 1e-6 && $y1 <= $extent->y + $extent->h + 1e-6;
+    }
+
+    expect($layers)->not->toBe([])->and($inside)->toBeTrue()
+        ->and($extent->w * $extent->h)->toBeLessThan($full->w * $full->h / 2);
+});
+
+it('follows the glints from tick to tick, and goes back to the whole graph when anything else repaints', function () {
+    $ui = pulsingGraph();
+    $full = $ui->g->bounds()->grow(Silk\Core\Tree\Widget::OVERDRAW);
+    $ui->tree->advance(1 / 60);
+    $first = $ui->g->paintExtent();
+    $ui->g->markPainted();
+    for ($i = 0; $i < 20; $i++) {
+        $ui->tree->advance(1 / 60);
+    }
+    $later = $ui->g->paintExtent();
+    $ui->g->invalidatePaint();
+
+    expect($later)->not->toEqual($first)
+        ->and($ui->g->paintExtent())->toEqual($full);
+});
+
+it('repaints a wire\'s halo whole, so its blur never meets the edge of the region', function () {
+    $ui = pulsingGraph();
+    $ui->g->setTypeStyle('color', 'LinkGlow', '1');
+    nodeGraphPaint($ui);
+    $ui->g->markPainted();
+    $ui->tree->advance(1 / 60);
+    $extent = $ui->g->paintExtent();
+    $p = new Venusian\Silk\Tests\Support\SpyPainter;
+    $ui->g->render($p);
+    $layers = callsOf($p, 'layer');
+    $halos = array_values(array_filter($layers, fn ($c) => $c[1][2] < 1.0 && $c[1][1] instanceof Closure));
+    $outside = 0;
+    foreach ($layers as $layer) {
+        $box = $layer[1][0];
+        [$x0, $y0] = ngAt($ui, $box->x, $box->y);
+        [$x1, $y1] = ngAt($ui, $box->x + $box->w, $box->y + $box->h);
+        $outside += ($x0 < $extent->x - 1e-6 || $y0 < $extent->y - 1e-6 || $x1 > $extent->x + $extent->w + 1e-6 || $y1 > $extent->y + $extent->h + 1e-6) ? 1 : 0;
+    }
+
+    expect(count($layers))->toBeGreaterThan(count($halos))->and($outside)->toBe(0);
+});
+
+it('repaints a glass look whole: a glass pane frosts what is around it', function () {
+    $ui = nodeGraphUi('raven-glass-dark');
+    $ui->g->connect($ui->out, $ui->a);
+    $ui->g->setFlowVisible(true);
+    nodeGraphPaint($ui);
+    $ui->g->markPainted();
+    $full = $ui->g->bounds()->grow(Silk\Core\Tree\Widget::OVERDRAW);
+    $ui->tree->advance(1 / 60);
+
+    expect($ui->g->paintExtent())->toEqual($full);
+});
+
+it('keeps the whole graph as its extent when something else asked for the frame too', function () {
+    $ui = pulsingGraph();
+    $full = $ui->g->bounds()->grow(Silk\Core\Tree\Widget::OVERDRAW);
+    $ui->g->setNodeColor($ui->mix, Surface\NutsAndBolts\Color::hex('#FF0000'));
+    $ui->tree->advance(1 / 60);
+
+    expect($ui->g->paintExtent())->toEqual($full);
+});
+
+it('starts no glints when the pointer is over a graph built without them, and does for one built with them', function () {
+    $glints = function (bool $onHover) {
+        $ui = nodeGraphUi('macos-dark', $onHover);
+        $ui->g->connect($ui->out, $ui->a);
+        ngMouse($ui, Silk\Contracts\Input\EventType::MouseMove, ngAt($ui, 200, 150), null);
+
+        return count(callsOf(nodeGraphPaint($ui), 'layer'));
+    };
+
+    expect($glints(true))->toBeGreaterThan(0)->and($glints(false))->toBe(0);
+});
+
 it('paints a RavenDark node as a Popup box of radius 10 over a shadow of 16, its header tinted 0.2 toward its colour, the title bold (node_graph.c:1087-1121, 1340-1405)', function () {
     $ui = nodeGraphUi();
     $ui->g->setNodeColor($ui->mix, Surface\NutsAndBolts\Color::hex('#FF0000'));

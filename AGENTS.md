@@ -5,3 +5,8 @@
 3. **The plain-PHP path is the fallback,** so everything works without the optional extensions. It is never the main design. On Velvet, the per-pixel work lives in the Framebuffer/Rasterize drivers (native + ext), never in VelvetGE or Silk.
 4. **Silk describes what to draw.** It holds no per-pixel loops.
 5. **Execution gate before "done":** a headless bench of the real gallery at scale 2, on Velvet with the extensions and on Metal. Idle frames settle. A scripted theme switch, hover and click settle within a budget, and input is handled between frames. Every plan states its thread, driver or engine, its cost per frame, and its cache invalidation.
+
+# Knowledge bundle
+
+6. **Read [`.okf/index.md`](.okf/index.md) first** before designing or changing anything. Open only the concepts the change touches. Surface's drawing concepts are in [`../surface/.okf`](../surface/.okf/index.md).
+7. **Durable facts go in `.okf`, in the same change.** Update the matching concept, bump its `generated.at`, append `.okf/log.md`. The bundle documents the package, never a session. Validate it with the okf validator `--strict`.

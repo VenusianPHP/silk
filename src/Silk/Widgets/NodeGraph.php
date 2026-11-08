@@ -176,6 +176,24 @@ class NodeGraph extends Container
 
     private bool $ticking = false;
 
+    /**
+     * Only the pulses moved since the last paint: nothing else asked for a repaint, so what changes is where the glints are
+     * (paintExtent). Any other invalidation clears it.
+     */
+    private bool $pulseOnly = false;
+
+    /** Whether the nodes were painted as glass: a glass pane frosts what is around it, so such a graph repaints whole. */
+    private bool $glassNodes = false;
+
+    /** @var array<int, array{list<list<float>>, float, float, bool}> the wires painted with pulses: their pieces, thickness, the margin of a layer and whether they have a halo, by link */
+    private array $flowing = [];
+
+    /** @var array{float, float, float} zoom and the origin the canvas was painted at, in the widget's coordinates */
+    private array $flowView = [1.0, 0.0, 0.0];
+
+    /** @var array{t: float, extent: ?Rect, glints: array<string, list<array{float, \Surface\NutsAndBolts\Path, Rect}>>}|null the glints of one flow time, kept from paintExtent() to paint() */
+    private ?array $glintMemo = null;
+
     /** @var array<string, list<array{\Surface\NutsAndBolts\Path, bool}>> the grid's paths while the view stays where it is (see paintGrid) */
     private array $gridPaths = [];
 
@@ -209,7 +227,8 @@ class NodeGraph extends Container
 
     private ?\Closure $clock = null;
 
-    public function __construct(string $name)
+    /** @param bool $glintsOnHover whether the flowing glints along the wires start when the pointer is over the graph (or a drag runs); false: hovering starts none */
+    public function __construct(string $name, private readonly bool $glintsOnHover = true)
     {
         parent::__construct($name);
         $this->focusable = true;
@@ -753,7 +772,93 @@ class NodeGraph extends Container
         return $this->pinColor($pin->id);
     }
 
-    // ---------------------------------------------------------------- paint (node_graph.c:1281-1782)
+    public function invalidatePaint(): static
+    {
+        $this->pulseOnly = false;
+        $this->glintMemo = null;
+
+        return parent::invalidatePaint();
+    }
+
+    /**
+     * Where paint() may draw. A frame the pulses alone asked for draws only where a glint is and was: the union of their
+     * layer boxes, so the rest of the graph (the grid, the nodes) is clipped away and costs the host nothing.
+     */
+    public function paintExtent(): Rect
+    {
+        $full = parent::paintExtent();
+        if (! $this->pulseOnly || $this->flowing === [] || $full != $this->bounds()->grow(self::OVERDRAW)) {
+            return $full;
+        }
+        if ($this->glintMemo === null || $this->glintMemo['t'] !== $this->flowTime) {
+            $this->glintMemo = $this->glintsNow();
+        }
+
+        return $this->glintMemo['extent'] ?? $full;
+    }
+
+    /**
+     * Where every glint is at the flow time now: its layer box on the canvas, and the union of them in the widget's
+     * coordinates. The extent is null when no glint shows (the whole widget then).
+     *
+     * @return array{t: float, extent: ?Rect, glints: array<string, list<array{float, \Surface\NutsAndBolts\Path, Rect}>>}
+     */
+    private function glintsNow(): array
+    {
+        [$zoom, $ox, $oy] = $this->flowView;
+        $extent = null;
+        $glints = [];
+        foreach ($this->flowing as $id => [$pieces, $thickness, $margin, $halo]) {
+            [$lengths] = Nodes\Wire::lengths($pieces);
+            $at = 0.0;
+            foreach ($pieces as $i => $piece) {
+                if ($halo) {
+                    // (a filter works on the layer it is given: the halo's layer is repainted whole or not at all, or its blur meets the edge of the region)
+                    $whole = $this->pieceBox($piece, $margin);
+                    $here = new Rect($whole->x * $zoom + $ox, $whole->y * $zoom + $oy, $whole->w * $zoom, $whole->h * $zoom);
+                    $extent = $extent === null ? $here : $extent->union($here);
+                }
+                $path = Nodes\Wire::path($piece);
+                $glints["{$id}:{$i}"] = $found = $this->glintsOf($path, $path->length(), $lengths[$i], $at, $thickness, $this->pieceBox($piece, $margin));
+                foreach ($found as [, , $box]) {
+                    $here = new Rect($box->x * $zoom + $ox, $box->y * $zoom + $oy, $box->w * $zoom, $box->h * $zoom);
+                    $extent = $extent === null ? $here : $extent->union($here);
+                }
+                $at += $lengths[$i];
+            }
+        }
+
+        return ['t' => $this->flowTime, 'extent' => $extent?->grow(1.0), 'glints' => $glints];
+    }
+
+    /**
+     * The bright stretches of a wire's piece at the flow time now: how far along it each is (0 to 1), the stretch, and the
+     * box of the layer it is drawn in: the glint and the reach of its blur (three sigma), not the whole piece, since the filter
+     * works on every pixel of the layer. $at is the length of the wire before the piece; $fallback the box when a stretch has none.
+     *
+     * @return list<array{float, \Surface\NutsAndBolts\Path, Rect}>
+     */
+    private function glintsOf(\Surface\NutsAndBolts\Path $path, float $len, float $pieceLength, float $at, float $thickness, Rect $fallback): array
+    {
+        // pulses a length of 120 apart, running at 0.85 a second; each a bright stretch of the wire
+        $pulses = max($pieceLength / 120.0, 0.25);
+        $phase = fmod($this->flowTime * 0.85 + $at / 120.0, 1.0);
+        $half = 0.16 * $len / $pulses;
+        $sigma = max(0.5, $thickness * 0.6);
+        $reach = ($thickness + 1.5) / 2 + 3.0 * $sigma + 2.0;
+        $found = [];
+        for ($n = 0; $n <= ceil($pulses); $n++) {
+            $a = ($n + $phase) / $pulses;
+            if ($a < 0.0 || $a > 1.0) {
+                continue;
+            }
+            $stretch = $path->segment(max(0.0, $a * $len - $half), min($len, $a * $len + $half));
+            $around = $stretch->bounds();
+            $found[] = [$a, $stretch, $around === null ? $fallback : new Rect($around[0] - $reach, $around[1] - $reach, $around[2] - $around[0] + 2 * $reach, $around[3] - $around[1] + 2 * $reach)];
+        }
+
+        return $found;
+    }
 
     /** rvn_node_graph_paint: the canvas and its grid; then, through the view, the wires, the nodes and the wire being pulled. */
     public function paint(\Silk\Contracts\Painter\Painter $p): void
@@ -762,12 +867,13 @@ class NodeGraph extends Container
         $this->view->sync();
         $this->placeContents();
         $l = $this->resolve();
+        $this->glassNodes = (bool) $l['glass'];
         $b = $this->bounds();
         $zoom = $this->view->drawZoom;
 
         // the pulses run while the pointer is over the graph, or always (and in Neon), or never
         $mode = $this->flow ?? ($l['c']->is('neon') ? true : null);
-        $on = ($mode === true || ($mode === null && ($this->mouseIn || $this->drag !== self::DRAG_NONE))) && $this->links !== [] && $this->isEnabled();
+        $on = ($mode === true || ($mode === null && $this->glintsOnHover && ($this->mouseIn || $this->drag !== self::DRAG_NONE))) && $this->links !== [] && $this->isEnabled();
         $l['flow'] = max(0.0, min(1.0, $this->flowShown->target($on ? 1.0 : 0.0)->value()));
         $this->keepTicking($on || array_filter($this->nodes, fn (Node $n) => $n->active) !== []);
 
@@ -779,6 +885,8 @@ class NodeGraph extends Container
 
         // ---- what zooms: the canvas through the view
         $p->pushTransform($zoom, $b->x + $this->view->panX, $b->y + $this->view->panY);
+        $this->flowing = [];
+        $this->flowView = [$zoom, $b->x + $this->view->panX, $b->y + $this->view->panY];
         foreach ($this->pins as $pin) {
             $pin->linked = false;
         }
@@ -813,7 +921,10 @@ class NodeGraph extends Container
             $grow = max(0.0, min(1.0, $link->grow->target(1.0)->value()));
             $grow < 0.995
                 ? $this->paintWire($p, $l, Nodes\Wire::start($pieces, $grow), $ll, $fc, RavenPaint::mix($fc, $tc, $grow), $link->selected, 0.0)
-                : $this->paintWire($p, $l, $pieces, $ll, $fc, $tc, $link->selected, $l['flow']);
+                : $this->paintWire($p, $l, $pieces, $ll, $fc, $tc, $link->selected, $l['flow'], $link->id);
+            if ($grow >= 0.995 && $l['flow'] > 0.01) {
+                $this->flowing[$link->id] = [$pieces, max($ll->size, 0.5), max($ll->size, 0.5) + 3.0 + 8.0 * $ll->glow + 12.0, $ll->glow > 0.01];
+            }
         }
         // wires that were let go draw back into their pin
         foreach ($this->ghosts as $i => $ghost) {
@@ -845,6 +956,7 @@ class NodeGraph extends Container
         }
         $p->popClip();
         $this->hasFocus && $p->rect($b->grow(2), new Color(0, 0, 0, 0), $body->radius + 2, $this->color(Role::Focus, $this->look()), 2.0);
+        $this->glintMemo = null;
         $this->painted = true;
     }
 
@@ -876,7 +988,7 @@ class NodeGraph extends Container
      *
      * @param  list<list<float>>  $pieces
      */
-    private function paintWire(\Silk\Contracts\Painter\Painter $p, array $l, array $pieces, PartStyle $link, Color $from, Color $to, bool $selected, float $flow): void
+    private function paintWire(\Silk\Contracts\Painter\Painter $p, array $l, array $pieces, PartStyle $link, Color $from, Color $to, bool $selected, float $flow, ?int $key = null): void
     {
         if ($pieces === []) {
             return;
@@ -912,19 +1024,13 @@ class NodeGraph extends Container
             }
             $this->strokeShaded($p, $path, $len, $c0, $c1, $thickness);
             if ($flow > 0.01) {
-                // pulses a length of 120 apart, running at 0.85 a second; each a bright stretch of the wire
-                $pulses = max($lengths[$i] / 120.0, 0.25);
-                $phase = fmod($this->flowTime * 0.85 + $at / 120.0, 1.0);
-                $half = 0.16 * $len / $pulses;
-                for ($n = 0; $n <= ceil($pulses); $n++) {
-                    $a = ($n + $phase) / $pulses;
-                    if ($a < 0.0 || $a > 1.0) {
-                        continue;
-                    }
+                // (the glints paintExtent() found for this frame are used again when nothing has moved since)
+                $memo = $this->pulseOnly && $key !== null && $this->glintMemo !== null && $this->glintMemo['t'] === $this->flowTime ? ($this->glintMemo['glints']["{$key}:{$i}"] ?? null) : null;
+                foreach ($memo ?? $this->glintsOf($path, $len, $lengths[$i], $at, $thickness, $box) as [$a, $stretch, $glintBox]) {
                     $glint = RavenPaint::mix(RavenPaint::mix($c0, $c1, $a), new Color(1, 1, 1, RavenPaint::mix($c0, $c1, $a)->alpha), 0.6);
-                    $stretch = $path->segment(max(0.0, $a * $len - $half), min($len, $a * $len + $half));
-                    $p->layer($box, fn ($q) => $q->stroke($stretch, $glint, new StrokeStyle($thickness + 1.5, StrokeCap::ROUND)), $flow,
-                        filter: FilterChain::of(Blur::gaussian(max(0.5, $thickness * 0.6) * $k)));
+                    $sigma = max(0.5, $thickness * 0.6);
+                    $p->layer($glintBox, fn ($q) => $q->stroke($stretch, $glint, new StrokeStyle($thickness + 1.5, StrokeCap::ROUND)), $flow,
+                        filter: FilterChain::of(Blur::gaussian($sigma * $k)));
                 }
             }
             $at += $lengths[$i];
@@ -1315,9 +1421,13 @@ class NodeGraph extends Container
         $this->tree()->tick(function (float $dt): bool {
             $this->flowTime = fmod($this->flowTime + $dt, 4096.0);
             $this->activeTime = fmod($this->activeTime + $dt, 4096.0);
+            $clean = ! $this->needsSelfPaint();
             $this->invalidatePaint();
             $flowing = $this->flowShown->value() > 0.01 || $this->flowShown->velocity() !== 0.0;
-            $this->ticking = $flowing || array_filter($this->nodes, fn (Node $n) => $n->active || $n->activeShown->value() > 0.01) !== [];
+            $running = array_filter($this->nodes, fn (Node $n) => $n->active || $n->activeShown->value() > 0.01) !== [];
+            $this->ticking = $flowing || $running;
+            // nothing but the pulses moved: the next paint is only where the glints are
+            $this->pulseOnly = $clean && ! $running && ! $this->glassNodes && $this->flowShown->atRest();
 
             return $this->ticking;
         });

@@ -1,0 +1,7 @@
+# Log
+
+## 2026-11-08
+
+* **One package**: the seven per-component `composer.json` files under `src/Silk` (Contracts, Core, Hosts, Looks, Painter, Text, Widgets) and the `replace` block that named them in the root `composer.json` are gone; Silk is not split into subtrees. The root PSR-4 `Silk\\` → `src/Silk` covers every folder. [overview](architecture/overview.md), spec section 5.1.
+* **BlockEditor** (the last of the 50 widgets): `src/Silk/Widgets/BlockEditor.php` over a model in `src/Silk/Widgets/Blocks/` (BlockModel, BlockKind, Block, BlockLayout, BlockShape, BlockPlace), mail BlockEditorChanged, BlockEditorClicked, BlockEditorContext, a Blocks page in the gallery, golden frames for it in three looks at two scales. Tests: BlocksModelTest and BlockEditorTest, 44 passed. Written from Raven's description of the block editor (the header's section and the behaviour of the widget), in Silk's terms. See [blocks](architecture/blocks.md).
+* Bundle created: [overview](architecture/overview.md), [surface contract](architecture/surface-contract.md), [widgets](architecture/widgets.md), [hosts](architecture/hosts.md), [input](architecture/input.md), [overlays](architecture/overlays.md), [motion](architecture/motion.md), [looks](architecture/looks.md), [painter](architecture/painter.md), [gallery and bench](runbooks/gallery-and-bench.md). Facts from the code, the 2026-11-04 design spec (where the code still follows it) and Surface's bundle.

@@ -433,9 +433,9 @@ function islandPointer(object $ui, EventType $type): void
 }
 
 /** A NodeGraph filling a 600 x 400 window, in $look: Colour (out colour) and Mix (in a, in b colours; out). */
-function nodeGraphUi(string $look = 'raven-dark'): object
+function nodeGraphUi(string $look = 'raven-dark', bool $glintsOnHover = true): object
 {
-    $ui = silkUi(fn ($root) => $root->add(new Silk\Widgets\NodeGraph('graph'), new Silk\Contracts\Widget\Slot(grow: 1)));
+    $ui = silkUi(fn ($root) => $root->add(new Silk\Widgets\NodeGraph('graph', $glintsOnHover), new Silk\Contracts\Widget\Slot(grow: 1)));
     inLook($ui, $look);
     $g = $ui->g = $ui->root->children()[0];
     $ui->colour = $g->addNode('Colour', 40, 60);
@@ -538,4 +538,86 @@ function inkContrast(object $ui, Silk\Core\Tree\Widget $w, string $title): float
     }
 
     return Silk\Painter\RavenPaint::contrast(Silk\Painter\RavenPaint::over($ink, $fill), $fill);
+}
+
+/** A block editor in a window, with one kind of each shape, laid out at 900 x 600 and painted once. */
+function blockUi(string $look = 'raven-dark'): object
+{
+    $ui = silkUi(fn ($root) => $root->add(new Silk\Widgets\BlockEditor('blocks'), new Silk\Contracts\Widget\Slot(grow: 1)));
+    inLook($ui, $look);
+    $e = $ui->e = $ui->root->children()[0];
+    $shape = Silk\Widgets\Blocks\BlockShape::class;
+    $e->addKind('start', 'when the game starts', $shape::Hat, 'Events');
+    $e->addKind('move', 'move %n{10} steps', $shape::Statement, 'Motion');
+    $e->addKind('say', 'say %s{Hello}', $shape::Statement, 'Looks');
+    $e->addKind('point', 'point %m', $shape::Statement, 'Motion');
+    $e->addKind('repeat', 'repeat %n{10}', $shape::C, 'Control');
+    $e->addKind('stop', 'stop all', $shape::Cap, 'Control');
+    $e->addKind('add', '%n + %n', $shape::Reporter, 'Operators');
+    $e->addKind('touching', 'touching %s ?', $shape::Boolean, 'Sensing');
+    $e->setSlotOptions('point', 0, ['north', 'east', 'south', 'west']);
+    $ui->tree->layout(new Size(900, 600));
+    blockPaint($ui);
+    $ui->loop->posted = [];
+
+    return $ui;
+}
+
+/** The editor painted once; the paint calls. */
+function blockPaint(object $ui): SpyPainter
+{
+    $p = new SpyPainter;
+    $ui->e->render($p);
+
+    return $p;
+}
+
+/** A point of the editor (its own units) as a point of the window. @return array{float, float} */
+function beLocal(object $ui, float $x, float $y): array
+{
+    $b = $ui->e->bounds();
+
+    return [$b->x + $x, $b->y + $y];
+}
+
+/** A canvas point as a point of the window (the view as it is). @return array{float, float} */
+function beCanvas(object $ui, float $cx, float $cy): array
+{
+    [$px, $py, $zoom] = $ui->e->view();
+
+    return beLocal($ui, Silk\Widgets\Blocks\BlockLayout::PALETTE_W + ($cx - $px) * $zoom, ($cy - $py) * $zoom);
+}
+
+/** The window point a little inside the palette block of a kind. @return array{float, float} */
+function bePalette(object $ui, string $kind): array
+{
+    foreach ($ui->e->blockLayout()->palette as $entry) {
+        if ($entry['kind'] === $kind) {
+            return beLocal($ui, $entry['block']->lx + 6, $entry['block']->ly + 8);
+        }
+    }
+    throw new RuntimeException("No palette block for {$kind}.");
+}
+
+/** A block added to the canvas and painted, so that it is where the layout puts it. */
+function beBlock(object $ui, string $kind, float $x, float $y): int
+{
+    $id = $ui->e->addBlock($kind, $x, $y);
+    blockPaint($ui);
+
+    return $id;
+}
+
+/** The window point a little inside a block. @return array{float, float} */
+function beOn(object $ui, int $block, float $dx = 6.0, float $dy = 8.0): array
+{
+    $b = $ui->e->model()->block($block);
+
+    return beCanvas($ui, $b->lx + $dx, $b->ly + $dy);
+}
+
+/** @return list<array{string, list<mixed>}> the calls of one kind a SpyPainter recorded */
+function blockCalls(SpyPainter $p, string $method): array
+{
+    return array_values(array_filter($p->calls, fn ($c) => $c[0] === $method));
 }

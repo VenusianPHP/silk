@@ -27,15 +27,29 @@ it('lays the pane as a glass pane in device pixels, rounded, its blur, grain, ti
         ->and($glass->tint)->toBe($look->tint);
 });
 
-it('draws a hairline over the pane, and a shadow only outside it', function () {
+it('draws a hairline over the pane, and gives the engine the shadow to paint between the backdrop and the pane', function () {
     $e = new SpyEngine;
     $e->frame(fn () => (new EnginePainter($e, 1.0))->blur(new Rect(40, 40, 100, 60), 8.0, new BlurLook(12.0, null, 1.0, 0.0, 0.0, Color::rgba(255, 255, 255, 0.14), 1.0, 20.0, Color::rgb(0, 0, 0))));
 
-    // the pane first, so it reads a backdrop the shadow has not darkened; then four strips of shadow; the outline last
-    expect($e->methods())->toContain('glass')
-        ->and(array_search('glass', $e->methods()))->toBeLessThan(array_search('shadow', $e->methods()))
-        ->and(count($e->argsOf('shadow')))->toBe(4)
+    // the shadow rides in the glass look (the engine reads the backdrop, paints it, then the pane over its rounded box); the outline last
+    [, , , , , $glass] = $e->argsOf('glass')[0];
+    expect($e->methods())->toContain('glass')->not->toContain('shadow')
+        ->and([$glass->shadow, $glass->shadowColor])->toEqual([20.0, Color::rgb(0, 0, 0)])
         ->and(end($e->calls)[0])->toBe('roundRect');
+});
+
+it('draws a faded pane\'s shadow as four strips around its box, as the pane would show it through', function () {
+    $e = new SpyEngine;
+    $e->frame(function () use ($e) {
+        $p = new EnginePainter($e, 1.0);
+        $p->pushOpacity(0.5);
+        $p->blur(new Rect(40, 40, 100, 60), 8.0, new BlurLook(12.0, null, 1.0, 0.0, 0.0, null, 0.0, 20.0, Color::rgb(0, 0, 0)));
+        $p->popOpacity();
+    });
+
+    [, , , , , $glass] = $e->argsOf('glass')[0];
+    expect($glass->shadow)->toBe(0.0)
+        ->and(count($e->argsOf('shadow')))->toBe(4);
 });
 
 it('paints nothing for a rect with no area or one off the viewport', function () {

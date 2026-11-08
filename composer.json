@@ -35,15 +35,6 @@
         "venusian-voyager/io-pools": "^0.11.0",
         "venusian-voyager/nuts-and-bolts": "^0.11.0"
     },
-    "replace": {
-        "venusian-silk/contracts": "self.version",
-        "venusian-silk/core": "self.version",
-        "venusian-silk/hosts": "self.version",
-        "venusian-silk/looks": "self.version",
-        "venusian-silk/painter": "self.version",
-        "venusian-silk/text": "self.version",
-        "venusian-silk/widgets": "self.version"
-    },
     "require-dev": {
         "pestphp/pest": "^4",
         "venusian/framework": "^0.11.0"
