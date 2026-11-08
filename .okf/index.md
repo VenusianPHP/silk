@@ -21,3 +21,4 @@ okf_version: "0.2"
 # Runbooks
 
 * [Gallery and bench](runbooks/gallery-and-bench.md) - examples/gallery.php, the bench and golden scripts, how to run them and what they hold.
+* [CI](runbooks/ci.md) - tests.yml: the matrix and patched floor, the sibling surface checkout, what runs on a runner and what skips.

@@ -39,29 +39,6 @@
         "pestphp/pest": "^4",
         "venusian/framework": "^0.11.0"
     },
-    "repositories": [
-        {
-            "type": "path",
-            "url": "../surface/src/Surface/*",
-            "options": {
-                "symlink": true
-            }
-        },
-        {
-            "type": "path",
-            "url": "../framework/src/Voyager/*",
-            "options": {
-                "symlink": true
-            }
-        },
-        {
-            "type": "path",
-            "url": "../framework",
-            "options": {
-                "symlink": true
-            }
-        }
-    ],
     "autoload": {
         "psr-4": {
             "Silk\\": "src/Silk"

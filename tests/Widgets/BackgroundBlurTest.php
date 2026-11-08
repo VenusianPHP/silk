@@ -53,11 +53,12 @@ it('paints Frosted as Raven does: the veil at 0.52 of the panel alpha, saturatio
 });
 
 it('lights a frosted pane more and strengthens its hairline in a light look', function () {
-    $ui = silkUi(fn ($root) => $root->backgroundBlur('pane'), null, 'raven-light');
-    [, , $look] = blurCall($ui->root->children()[0]);
+    $ui = blurUi();
+    inLook($ui, 'raven-light');
+    [, , $look] = blurCall($ui->pane);
 
     expect($look->light)->toBe(0.03)->and($look->border->alpha)->toBe(0.55);
-})->skip(fn () => ! function_exists('silkUiIn'), 'silkUi has no look argument');
+});
 
 it('paints Plain with no veil, no grain and no hairline unless asked', function () {
     $ui = blurUi(fn ($b) => $b->setStyle(BlurStyle::Plain));

@@ -1,7 +1,7 @@
 ---
 type: Module
 title: Blocks
-
+description: BlockEditor - the model (kinds, labels, attach rules), the layout and hit tests, the widget, its mail and tests.
 resource: src/Silk/Widgets/Blocks/
 tags: [silk, widgets, blockeditor, blocks]
 status: draft

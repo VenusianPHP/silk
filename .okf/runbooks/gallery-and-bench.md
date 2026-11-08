@@ -5,7 +5,7 @@ description: examples/gallery.php shows every widget on every theme; bench-galle
 resource: scripts/
 tags: [silk, gallery, bench, golden, gate]
 status: draft
-generated: { by: claude-sonnet/5.5, at: 2026-11-08T04:30:00Z }
+generated: { by: claude-sonnet/5.5, at: 2026-11-08T16:45:00Z }
 sources:
   - id: gallery
     resource: examples/gallery.php
@@ -45,7 +45,7 @@ BENCH_TABS=0 zhp scripts/bench-gallery.php   skip every tab's cold frame
 
 # golden-frames
 
-`zhp scripts/golden-frames.php record [--keep] [filter]` and `check [filter]` hold Velvet's pixels byte for byte (sha256 of 134 frames in `tests/Fixtures/golden-frames.json`): Surface's GpuParity scenes, anti-aliased and hard, and the real gallery, every tab settled, in raven-dark, raven-light and raven-glass-dark at scales 1 and 2 (on Velvet with ext-rasterize and ext-fb). The gallery's clock reads are pinned so the frames are deterministic. `GOLDEN_SURFACE` loads another Surface checkout (for a baseline); `GOLDEN_RAW` is where a failing frame's raw RGBA8 goes. It is for changes that must not move a pixel; a change that moves pixels on purpose (the glass rewrite) means re-recording the affected frames.
+`zhp scripts/golden-frames.php record [--keep] [filter]` and `check [filter]` hold Velvet's pixels byte for byte (sha256 of 140 frames in `tests/Fixtures/golden-frames.json`): Surface's GpuParity scenes, anti-aliased and hard, and the real gallery, every tab settled, in raven-dark, raven-light and raven-glass-dark at scales 1 and 2 (on Velvet with ext-rasterize and ext-fb). The gallery's clock reads are pinned so the frames are deterministic. `GOLDEN_SURFACE` loads another Surface checkout (for a baseline); `GOLDEN_RAW` is where a failing frame's raw RGBA8 goes. It is for changes that must not move a pixel; a change that moves pixels on purpose (the glass rewrite) means re-recording the affected frames.
 
 # Running them here
 

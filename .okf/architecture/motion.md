@@ -5,7 +5,7 @@ description: Damped springs in closed form with four presets, appear transitions
 resource: src/Silk/Core/Motion/
 tags: [silk, motion, springs]
 status: draft
-generated: { by: claude-sonnet/5.5, at: 2026-11-08T04:30:00Z }
+generated: { by: claude-sonnet/5.5, at: 2026-11-08T16:45:00Z }
 sources:
   - id: spring
     resource: src/Silk/Core/Motion/Spring.php
@@ -32,11 +32,11 @@ Every animated value is a damped oscillator (value, velocity, target) stepped wi
 | Bouncy | 0.38 | 0.52 | switches, popups, press release, tooltips |
 | Wobbly | 0.50 | 0.32 | fly-ins, drops |
 
-A look's `Motion` is `Springy` (Raven's) or `Smooth` (platform families: the bouncy and wobbly presets become snappy and nothing squashes).
+A look's `Motion` is `Springy` (Raven's) or `Smooth` (the platform families: press release takes Snappy, nothing squashes, a tooltip fades Smooth — popups still grow out on Bouncy, drops and the node-wire sway stay Wobbly).
 
 # Stepping
 
-`FrameClock` turns the real gap since the last frame (0.001..0.25 s) into equal steps of at most 1/30 s; `Tree::advance(dt)` steps every moving spring, marks its widget for paint and reports whether anything still moves. `Tree::wantsPaint()` is how the [frame loop](hosts.md) keeps painting while a spring moves, and stops when none does.
+`FrameClock` turns the real gap since the last frame (0.001..0.25 s) into equal steps of at most 1/30 s; `Tree::advance(dt)` steps every moving spring, marks its widget for paint and reports whether anything still moves. After `advance()`, `Tree::needsPaint()` is how the [frame loop](hosts.md) keeps painting while a spring moves, and stops when none does.
 
 # Transitions
 

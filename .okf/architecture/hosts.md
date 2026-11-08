@@ -5,7 +5,7 @@ description: CanvasHost and StagedHost bind a Silk tree to an engine and a windo
 resource: src/Silk/Hosts/
 tags: [silk, host, frame-loop]
 status: draft
-generated: { by: claude-sonnet/5.5, at: 2026-11-08T04:30:00Z }
+generated: { by: claude-sonnet/5.5, at: 2026-11-08T16:45:00Z }
 sources:
   - id: loop
     resource: src/Silk/Hosts/FrameLoop.php
@@ -26,9 +26,9 @@ sources:
 `FrameLoop::frame(Host)` does, in order:[^loop]
 
 1. Drain the host's queued [SilkEvents](input.md) and dispatch each through the host's Router.
-2. Step the [springs](motion.md): `FrameClock` turns the real gap since the last frame (bounded to 0.001..0.25 s) into equal steps of at most 1/30 s, and `Tree::advance()` takes each; a tree with no live spring forgets the clock.
+2. Step the [springs](motion.md): `FrameClock` turns the real gap since the last frame (bounded to 0.001..0.25 s) into equal steps of at most 1/30 s, and `Tree::advance()` takes each.
 3. Lay the tree out to the host's viewport (up to `Tree::MAX_PASSES` = 4 measure/arrange passes while something re-dirties, as wrapped text does).
-4. If nothing needs paint and nothing wants paint (a moving spring), return false: no layout work beyond the check, no paint, no present.
+4. If nothing needs paint and nothing wants paint (`Tree::wantsPaint()`: a full repaint or leftover damage), return false: no layout work beyond the check, no paint, no present, and the clock is forgotten.
 5. Otherwise, inside `engine->frame()`, `Tree::paintAll(new EnginePainter(...))`: the [Painter](painter.md) records only the dirty region; the engine's own damage diffing limits the pixels touched. Then `host->present()`.
 
 `FramePump` is the Silk resource on the Venusian loop: it joins when `event-loop` resolves and runs one frame per attached host per tick.
