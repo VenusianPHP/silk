@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true">
+    <testsuites>
+        <testsuite name="silk">
+            <directory suffix="Test.php">./tests</directory>
+        </testsuite>
+    </testsuites>
+    <php>
+        <!-- The 100,000-row fixtures (ListView, Table, TreeView, TileView) need about 50 MB each, on top of what the
+             suite keeps; that leaks nothing is pinned by the memory tests (TableTest: one copy of the rows). -->
+        <ini name="memory_limit" value="1G"/>
+    </php>
+</phpunit>

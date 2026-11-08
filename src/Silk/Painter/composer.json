@@ -1,0 +1,42 @@
+{
+    "name": "venusian-silk/painter",
+    "description": "Silk painter: snapping, clip stack, lowering to RenderingEngine.",
+    "keywords": [
+        "venusian",
+        "silk",
+        "widgets",
+        "painter"
+    ],
+    "license": "MIT",
+    "homepage": "https://venusian.projectsaturnstudios.com/ecosystem/venusian/silk/0.11.x/painter",
+    "support": {
+        "issues": "https://github.com/VenusianPHP/silk/issues",
+        "source": "https://github.com/venusian-silk/painter"
+    },
+    "authors": [
+        {
+            "name": "Angel Gonzalez",
+            "email": "angel@projectsaturnstudios.com"
+        }
+    ],
+    "require": {
+        "php": "~8.4.27||^8.5.12",
+        "venusian-silk/contracts": "^0.11.0",
+        "venusian-surface/drawing": "^0.11.0"
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "autoload": {
+        "psr-4": {
+            "Silk\\Painter\\": ""
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "0.11.x-dev"
+        }
+    }
+}

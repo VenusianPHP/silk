@@ -1,0 +1,102 @@
+{
+    "name": "venusian/silk",
+    "description": "Self-drawn, springy widgets for Venusian Surface.",
+    "keywords": [
+        "framework",
+        "venusian",
+        "surface",
+        "widgets",
+        "ui"
+    ],
+    "license": "MIT",
+    "version": "0.11.0",
+    "homepage": "https://venusian.projectsaturnstudios.com/ecosystem/venusian/silk/0.11.x",
+    "support": {
+        "issues": "https://github.com/VenusianPHP/silk/issues",
+        "source": "https://github.com/VenusianPHP/silk"
+    },
+    "authors": [
+        {
+            "name": "Angel Gonzalez",
+            "email": "angel@projectsaturnstudios.com"
+        }
+    ],
+    "require": {
+        "php": "~8.4.27||^8.5.12",
+        "venusian-surface/contracts": "^0.11.0",
+        "venusian-surface/drawing": "^0.11.0",
+        "venusian-surface/fonts": "^0.11.0",
+        "venusian-surface/framebuffers": "^0.11.0",
+        "venusian-surface/human-input": "^0.11.0",
+        "venusian-surface/images": "^0.11.0",
+        "venusian-surface/nuts-and-bolts": "^0.11.0",
+        "venusian-surface/windows": "^0.11.0",
+        "venusian-voyager/contracts": "^0.11.0",
+        "venusian-voyager/io-pools": "^0.11.0",
+        "venusian-voyager/nuts-and-bolts": "^0.11.0"
+    },
+    "replace": {
+        "venusian-silk/contracts": "self.version",
+        "venusian-silk/core": "self.version",
+        "venusian-silk/hosts": "self.version",
+        "venusian-silk/looks": "self.version",
+        "venusian-silk/painter": "self.version",
+        "venusian-silk/text": "self.version",
+        "venusian-silk/widgets": "self.version"
+    },
+    "require-dev": {
+        "pestphp/pest": "^4",
+        "venusian/framework": "^0.11.0"
+    },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../surface/src/Surface/*",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../framework/src/Voyager/*",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "../framework",
+            "options": {
+                "symlink": true
+            }
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "Silk\\": "src/Silk"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Venusian\\Silk\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "0.11.x-dev"
+        },
+        "venusian": {
+            "providers": [
+                "Silk\\Core\\Providers\\SilkServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
