@@ -11,13 +11,14 @@ permissions:
   contents: read
 
 jobs:
-  tests:
-    runs-on: ubuntu-latest
+  linux:
+    runs-on: ubuntu-24.04
 
     strategy:
       fail-fast: false
       matrix:
         php: ['8.4', '8.5']
+        ts: [nts, zts]
         # Security floor (composer.json "php": "~8.4.27||^8.5.12"): each line's lowest patched release.
         include:
           - php: '8.4'
@@ -25,7 +26,7 @@ jobs:
           - php: '8.5'
             min: '8.5.12'
 
-    name: PHP ${{ matrix.php }}
+    name: PHP ${{ matrix.php }} ${{ matrix.ts }}, Linux
 
     env:
       # tests/Pest.php and tests/Support/M2Helpers.php read Surface's test fakes and fixtures from a
@@ -43,9 +44,60 @@ jobs:
           php-version: ${{ matrix.php }}
           # Angel's native font and raster exts (freetype, harfbuzz, fontconfig, fb, rasterize, imgdec)
           # are not built for GitHub runners, so the real-text tests skip there, as Surface's ext tests do.
+          # ZTS needs no ext-parallel: silk's suite has no thread rows (it runs ZTS-green without it).
           extensions: dom, gd, intl, mbstring
           coverage: none
         env:
+          phpts: ${{ matrix.ts == 'zts' && 'ts' || 'nts' }}
+          # the newest patch of the line, never a cached older build
+          update: true
+
+      - name: Refuse a PHP below the patched floor
+        env:
+          PHP_FLOOR: ${{ matrix.min }}
+        run: |
+          php -r 'if (version_compare(PHP_VERSION, getenv("PHP_FLOOR"), "<")) { fwrite(STDERR, "PHP ".PHP_VERSION." is below the patched floor ".getenv("PHP_FLOOR").PHP_EOL); exit(1); } echo "PHP ".PHP_VERSION.PHP_EOL;'
+
+      - name: Install Composer dependencies
+        run: composer update --prefer-stable --no-interaction --no-progress
+
+      - name: Execute tests
+        run: vendor/bin/pest
+
+  macos:
+    runs-on: macos-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.4', '8.5']
+        ts: [nts, zts]
+        include:
+          - php: '8.4'
+            min: '8.4.27'
+          - php: '8.5'
+            min: '8.5.12'
+
+    name: PHP ${{ matrix.php }} ${{ matrix.ts }}, macOS
+
+    env:
+      SURFACE_TESTS: ${{ github.workspace }}/../surface/tests
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Checkout venusian/surface for its test fixtures
+        run: git clone --depth 1 https://github.com/VenusianPHP/surface.git ../surface
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          # Angel's native font and raster exts are not built for GitHub runners either; the
+          # real-text tests skip on macOS cells too. ZTS needs no ext-parallel (no thread rows).
+          extensions: dom, gd, intl, mbstring
+          coverage: none
+        env:
+          phpts: ${{ matrix.ts == 'zts' && 'ts' || 'nts' }}
           # the newest patch of the line, never a cached older build
           update: true
 

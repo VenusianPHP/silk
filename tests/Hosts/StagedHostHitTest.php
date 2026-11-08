@@ -29,16 +29,16 @@ it('installs a hit test that maps points to units and asks the HeaderBar', funct
 
 it('resizes in a 6 u band at the window edges, diagonally within 18 u of a corner', function () {
     $ui = stagedUi();
-    [$w, $h] = [400, 300];
+    [$w, $h] = [900, 640];
 
-    expect(($ui->test)(200, 2 * 2))->toBe(HitArea::ResizeTop)
+    expect(($ui->test)(450, 2 * 2))->toBe(HitArea::ResizeTop)
         ->and(($ui->test)(2, 2))->toBe(HitArea::ResizeTopLeft)
         ->and(($ui->test)(2 * 17, 2))->toBe(HitArea::ResizeTopLeft)
-        ->and(($ui->test)($w - 2, 150))->toBe(HitArea::ResizeRight)
+        ->and(($ui->test)($w - 2, 320))->toBe(HitArea::ResizeRight)
         ->and(($ui->test)($w - 2, $h - 2))->toBe(HitArea::ResizeBottomRight)
-        ->and(($ui->test)(200, $h - 2))->toBe(HitArea::ResizeBottom)
-        ->and(($ui->test)(2, 150))->toBe(HitArea::ResizeLeft)
-        ->and(($ui->test)(2 * 7, 150))->toBe(HitArea::Normal);
+        ->and(($ui->test)(450, $h - 2))->toBe(HitArea::ResizeBottom)
+        ->and(($ui->test)(2, 320))->toBe(HitArea::ResizeLeft)
+        ->and(($ui->test)(2 * 7, 320))->toBe(HitArea::Normal);
 });
 
 it('offers the window actions and runs them on the window', function () {

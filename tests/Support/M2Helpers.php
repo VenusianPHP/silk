@@ -372,16 +372,16 @@ function dragMoveTo(object $ui, array $at): void
     $ui->router->dispatch(new SilkEvent(EventType::MouseMove, x: $at[0], y: $at[1], button: MouseButton::LEFT));
 }
 
-/** A 400x300 staged window (UI scale 2) whose tree has a HeaderBar at the top. */
+/** A 900x640 staged window (the gallery's size, UI scale 2) whose tree has a HeaderBar at the top. */
 function stagedUi(array $capabilities = [WindowCapability::HitTest]): object
 {
     FakeStagedWindow::$capabilities = $capabilities;
-    $window = (new FakeStager(new FakeSession))->openStaged('stage', 400, 300, []);
+    $window = (new FakeStager(new FakeSession))->openStaged('stage', 900, 640, []);
     $root = new Column('window', 0, 0);
     $root->add($bar = new HeaderBar('bar', 'Title'));
     $look = (new LookManager)->extend('raven-dark', fn () => RavenDark::theme())->use('raven-dark')->current();
     $tree = new Tree($root, $look, new SpyLoop, 'stage');
-    $host = new StagedHost($window, $tree, new SpyEngine(400, 300), uiScale: 2.0);
+    $host = new StagedHost($window, $tree, new SpyEngine(900, 640), uiScale: 2.0);
     $tree->layout($host->viewport());
 
     return (object) ['window' => $window, 'tree' => $tree, 'host' => $host, 'bar' => $bar,
