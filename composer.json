@@ -9,7 +9,7 @@
         "ui"
     ],
     "license": "MIT",
-    "version": "0.11.0",
+    "version": "0.11.2",
     "homepage": "https://venusian.projectsaturnstudios.com/ecosystem/venusian/silk/0.11.x",
     "support": {
         "issues": "https://github.com/VenusianPHP/silk/issues",
