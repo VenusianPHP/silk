@@ -80,6 +80,18 @@ it('diffs the hover path into Leave and Enter', function () {
         ->and($root->types())->toBe(['Enter', 'MouseMove', 'MouseMove']);
 });
 
+it('sends no Leave to a hovered widget removed from the tree', function () {
+    ['root' => $root, 'outer' => $outer, 'leaf' => $leaf, 'tree' => $tree, 'router' => $router] = routedTree();
+    $router->dispatch(mouse(EventType::MouseMove, 5, 5));
+
+    $root->remove($outer);
+    $tree->layout(new Size(200, 200));
+    $router->dispatch(mouse(EventType::MouseMove, 5, 5));
+
+    expect($leaf->types())->toBe(['Enter', 'MouseMove'])
+        ->and($outer->types())->toBe(['Enter', 'MouseMove']);
+});
+
 it('leaves the whole hover path when the pointer leaves the host', function () {
     ['root' => $root, 'leaf' => $leaf, 'router' => $router] = routedTree();
     $router->dispatch(mouse(EventType::MouseMove, 5, 5));

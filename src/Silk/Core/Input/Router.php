@@ -198,7 +198,8 @@ class Router
     private function hover(array $path, SilkEvent $e): bool
     {
         foreach ($this->hovered as $w) {
-            if (! in_array($w, $path, true) && $w->isEnabled()) {
+            // a widget removed since the last move left with its subtree: it hears nothing more
+            if (! in_array($w, $path, true) && $w->isEnabled() && $w->tree() === $this->tree) {
                 $w->handle($this->local($w, $e->as(EventType::Leave)));
             }
         }
